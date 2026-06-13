@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram Vault — Login</title>
+    <link rel="icon" type="image/svg+xml" href="/static/logo.svg">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg: #101012;
+            --surface: #18181b;
+            --border: #27272a;
+            --text: #e4e4e7;
+            --text-muted: #52525b;
+            --accent: #10b981;
+            --danger: #ef4444;
+        }
+        body {
+            font-family: 'IBM Plex Sans', -apple-system, system-ui, sans-serif;
+            background: var(--bg); color: var(--text);
+            min-height: 100vh; display: flex;
+            align-items: center; justify-content: center;
+            padding: 24px;
+        }
+        .login-wrap { width: 100%; max-width: 400px; }
+        .login-header { text-align: center; margin-bottom: 32px; }
+        .login-header h1 { font-size: 24px; font-weight: 700; color: #fff; letter-spacing: -0.5px; }
+        .login-header h1 span { color: var(--text-muted); font-weight: 400; }
+        .login-header p { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+        .login-box {
+            background: var(--surface); border: 1px solid var(--border);
+            padding: 32px;
+        }
+        .field { margin-bottom: 20px; }
+        .field label {
+            display: block; font-size: 12px; font-weight: 600;
+            color: var(--text-muted); text-transform: uppercase;
+            letter-spacing: 0.05em; margin-bottom: 8px;
+        }
+        .field input {
+            width: 100%; padding: 12px 16px;
+            background: var(--bg); border: 1px solid var(--border);
+            color: var(--text); font-size: 14px;
+            font-family: 'IBM Plex Mono', monospace;
+            outline: none; transition: border-color 0.15s;
+        }
+        .field input:focus { border-color: var(--accent); }
+        .captcha-wrap { display: flex; justify-content: center; margin-bottom: 24px; }
+        .btn-login {
+            width: 100%; padding: 14px;
+            background: var(--accent); border: none;
+            color: #000; font-size: 14px; font-weight: 700;
+            cursor: pointer; transition: opacity 0.15s;
+        }
+        .btn-login:hover { opacity: 0.85; }
+        .error-box {
+            background: rgba(239, 68, 68, 0.08);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            padding: 12px 16px; margin-bottom: 20px;
+            font-size: 13px; color: var(--danger); font-weight: 500;
+        }
+        .footer { text-align: center; margin-top: 24px; font-size: 11px; color: var(--text-muted); line-height: 1.6; }
+    </style>
+</head>
+<body>
+    <div class="login-wrap">
+        <div class="login-header">
+            <h1 style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                Telegram<span>-Vault</span>
+            </h1>
+            <p>Authentication required to continue</p>
+        </div>
+        <div class="login-box">
+            {% if error %}
+            <div class="error-box">{{ error }}</div>
+            {% endif %}
+            <form method="POST" action="/login">
+                <div class="field">
+                    <label>Access Password</label>
+                    <input type="password" name="password" required autocomplete="off" placeholder="Enter your password">
+                </div>
+                <div class="captcha-wrap">
+                    <div class="h-captcha" data-sitekey="{{ hcaptcha_site_key }}" data-theme="dark"></div>
+                </div>
+                <button type="submit" class="btn-login">Log In</button>
+            </form>
+        </div>
+        <div class="footer">
+            All access attempts are logged.<br>
+            Unauthorized access attempts will be reported.<br><br>
+            Powered by <a href="https://github.com/diceandink" target="_blank" style="color:var(--text-muted); text-decoration:none;">github.com/diceandink</a>
+        </div>
+    </div>
+</body>
+</html>

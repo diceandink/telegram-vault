@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram Vault — Auth Logs</title>
+    <link rel="icon" type="image/svg+xml" href="/static/logo.svg">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg: #101012;
+            --surface: #18181b;
+            --surface-2: #1f1f23;
+            --border: #27272a;
+            --text: #e4e4e7;
+            --text-dim: #71717a;
+            --text-muted: #52525b;
+            --accent: #10b981;
+            --accent-dim: rgba(16, 185, 129, 0.12);
+            --danger: #ef4444;
+            --danger-dim: rgba(239, 68, 68, 0.10);
+            --warn: #f59e0b;
+        }
+        body {
+            font-family: 'IBM Plex Sans', -apple-system, system-ui, sans-serif;
+            background: var(--bg); color: var(--text); min-height: 100vh;
+        }
+        .container { max-width: 1440px; margin: 0 auto; padding: 32px 24px; }
+
+        /* Header */
+        .header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding-bottom: 24px; margin-bottom: 24px; border-bottom: 1px solid var(--border);
+        }
+        .header-left { display: flex; align-items: center; gap: 16px; }
+        .logo { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; color: #fff; }
+        .logo span { color: var(--text-muted); font-weight: 400; }
+        .breadcrumb { font-size: 12px; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-dim); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--accent); }
+        .header-right { display: flex; align-items: center; gap: 16px; }
+
+        .stat { text-align: right; }
+        .stat-value { font-family: 'IBM Plex Mono', monospace; font-size: 22px; font-weight: 700; }
+        .stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+        .stat-success .stat-value { color: var(--accent); }
+        .stat-fail .stat-value { color: var(--danger); }
+
+        .btn-back {
+            font-size: 12px; font-weight: 600; color: var(--text-muted);
+            border: 1px solid var(--border); padding: 6px 16px;
+            background: none; cursor: pointer; text-decoration: none; transition: all 0.15s;
+        }
+        .btn-back:hover { color: var(--text); border-color: var(--text-dim); }
+
+        /* Table */
+        .table-wrap { background: var(--surface); border: 1px solid var(--border); overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        thead th {
+            padding: 14px 16px; font-size: 11px; font-weight: 600;
+            color: var(--text-muted); text-transform: uppercase;
+            letter-spacing: 0.04em; text-align: left;
+            background: var(--surface-2); border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+        tbody tr { border-bottom: 1px solid rgba(255,255,255,0.03); transition: background 0.1s; }
+        tbody tr:hover { background: rgba(255,255,255,0.02); }
+        tbody td { padding: 12px 16px; font-size: 13px; vertical-align: middle; }
+
+        /* Status badge */
+        .badge-ok {
+            display: inline-block; padding: 3px 10px; font-size: 11px; font-weight: 700;
+            background: var(--accent-dim); color: var(--accent); border-radius: 999px;
+        }
+        .badge-fail {
+            display: inline-block; padding: 3px 10px; font-size: 11px; font-weight: 700;
+            background: var(--danger-dim); color: var(--danger); border-radius: 999px;
+        }
+
+        /* IP cell */
+        .ip-cell {
+            font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+            cursor: pointer; user-select: none; transition: color 0.15s;
+            color: var(--text-dim);
+        }
+        .ip-cell:hover { color: var(--accent); }
+        .ip-cell .real { display: none; color: var(--warn); }
+        .ip-cell.revealed .hash { display: none; }
+        .ip-cell.revealed .real { display: inline; }
+
+        .cell-mono { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--text-dim); }
+        .cell-time { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--text-dim); white-space: nowrap; }
+        .cell-reason { font-size: 12px; }
+        .cell-pw { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--warn); }
+
+        /* UA detail */
+        .ua-cell { max-width: 280px; }
+        .ua-browser { font-size: 12px; font-weight: 600; color: var(--text); }
+        .ua-os { font-size: 11px; color: var(--text-muted); }
+        .ua-raw {
+            display: none; font-size: 10px; color: var(--text-muted);
+            font-family: 'IBM Plex Mono', monospace; word-break: break-all;
+            margin-top: 4px; padding: 4px 6px; background: var(--bg); border: 1px solid var(--border);
+        }
+        .ua-cell:hover .ua-raw { display: block; }
+
+        .empty-state { text-align: center; padding: 80px 20px; color: var(--text-muted); font-size: 13px; }
+
+        @media (max-width: 768px) {
+            .header { flex-direction: column; align-items: flex-start; gap: 16px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="header-left">
+                <div>
+                    <div class="logo">
+                        Telegram<span>-Vault</span>
+                    </div>
+                    <div class="breadcrumb"><a href="/">Home</a> / Auth Logs</div>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="stat stat-success">
+                    <div class="stat-value" id="count-ok">0</div>
+                    <div class="stat-label">Success</div>
+                </div>
+                <div class="stat stat-fail">
+                    <div class="stat-value" id="count-fail">0</div>
+                    <div class="stat-label">Failed</div>
+                </div>
+                <a href="/" class="btn-back">← Dashboard</a>
+            </div>
+        </header>
+
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date/Time</th>
+                        <th>Status</th>
+                        <th>IP Address</th>
+                        <th>Password Attempt</th>
+                        <th>Result</th>
+                        <th>Browser / Device</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody">
+                    <tr><td colspan="6" class="empty-state">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div style="text-align: center; margin-top: 24px; font-size: 11px; color: var(--text-muted);">
+            Powered by <a href="https://github.com/diceandink" target="_blank" style="color:var(--text-muted); text-decoration:none;">github.com/diceandink</a>
+        </div>
+    </div>
+
+    <script>
+        function parseUA(raw) {
+            let browser = 'Unknown', os = 'Unknown';
+            if (/Edg\//i.test(raw)) browser = 'Edge ' + (raw.match(/Edg\/([\d.]+)/)||[,''])[1];
+            else if (/OPR\//i.test(raw)) browser = 'Opera ' + (raw.match(/OPR\/([\d.]+)/)||[,''])[1];
+            else if (/Chrome\//i.test(raw)) browser = 'Chrome ' + (raw.match(/Chrome\/([\d.]+)/)||[,''])[1];
+            else if (/Firefox\//i.test(raw)) browser = 'Firefox ' + (raw.match(/Firefox\/([\d.]+)/)||[,''])[1];
+            else if (/Safari\//i.test(raw) && !/Chrome/i.test(raw)) browser = 'Safari ' + (raw.match(/Version\/([\d.]+)/)||[,''])[1];
+            else if (/curl/i.test(raw)) browser = 'curl';
+            else if (/python/i.test(raw)) browser = 'Python Script';
+
+            if (/Windows NT 10/i.test(raw)) os = 'Windows 10/11';
+            else if (/Windows/i.test(raw)) os = 'Windows';
+            else if (/Mac OS X/i.test(raw)) os = 'macOS';
+            else if (/Android/i.test(raw)) os = 'Android';
+            else if (/iPhone|iPad/i.test(raw)) os = 'iOS';
+            else if (/Linux/i.test(raw)) os = 'Linux';
+
+            return { browser, os };
+        }
+
+        function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+        async function load() {
+            try {
+                const r = await fetch('/api/login-logs');
+                if (r.status === 401) { location.href = '/login'; return; }
+                const json = await r.json();
+                const logs = json.logs;
+
+                let ok = 0, fail = 0;
+                logs.forEach(l => l.success ? ok++ : fail++);
+                document.getElementById('count-ok').textContent = ok;
+                document.getElementById('count-fail').textContent = fail;
+
+                const tb = document.getElementById('tbody');
+                if (logs.length === 0) {
+                    tb.innerHTML = '<tr><td colspan="6" class="empty-state">No login attempts yet.</td></tr>';
+                    return;
+                }
+
+                tb.innerHTML = '';
+                logs.forEach(l => {
+                    const t = new Date(l.time);
+                    const ua = parseUA(l.user_agent);
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td class="cell-time">${t.toLocaleDateString('en-US')}<br>${t.toLocaleTimeString('en-US')}</td>
+                        <td>${l.success ? '<span class="badge-ok">Success</span>' : '<span class="badge-fail">Failed</span>'}</td>
+                        <td>
+                            <div class="ip-cell" onclick="this.classList.toggle('revealed')" title="Click: Show/hide IP">
+                                <span class="hash">${esc(l.ip_hash)}…</span>
+                                <span class="real">${esc(l.ip)}</span>
+                            </div>
+                        </td>
+                        <td class="cell-pw">${esc(l.password_tried)}</td>
+                        <td class="cell-reason">${esc(l.reason)}</td>
+                        <td class="ua-cell">
+                            <div class="ua-browser">${esc(ua.browser)}</div>
+                            <div class="ua-os">${esc(ua.os)}</div>
+                            <div class="ua-raw">${esc(l.user_agent)}</div>
+                        </td>`;
+                    tb.appendChild(tr);
+                });
+            } catch(e) { console.error(e); }
+        }
+
+        load();
+        setInterval(load, 10000);
+    </script>
+</body>
+</html>

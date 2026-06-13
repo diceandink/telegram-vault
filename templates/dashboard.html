@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram Vault | Intelligence Hub</title>
+    <link rel="icon" type="image/svg+xml" href="/static/logo.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --bg: #080a0f;
+            --surface: #0d1117;
+            --surface-2: #161b22;
+            --surface-3: #1c2230;
+            --border: rgba(255,255,255,0.07);
+            --accent: #10b981;
+            --accent-dim: rgba(16,185,129,0.15);
+            --red: #ef4444;
+            --red-dim: rgba(239,68,68,0.15);
+            --yellow: #f59e0b;
+            --blue: #3b82f6;
+            --text: #e6edf3;
+            --text-dim: #8b949e;
+            --text-muted: #4d5566;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+        }
+
+        /* ---- Header ---- */
+        .header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 32px; height: 60px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            position: sticky; top: 0; z-index: 100;
+        }
+        .header-left { display: flex; align-items: center; gap: 16px; }
+        .logo { font-size: 18px; font-weight: 800; letter-spacing: -0.5px; }
+        .logo span { color: var(--accent); }
+        .page-title {
+            font-size: 12px; font-weight: 600; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: 0.1em;
+            padding-left: 16px; border-left: 1px solid var(--border);
+        }
+        .header-right { display: flex; align-items: center; gap: 12px; }
+        .live-badge {
+            display: flex; align-items: center; gap: 6px;
+            background: var(--accent-dim); border: 1px solid rgba(16,185,129,0.3);
+            padding: 4px 12px; border-radius: 20px;
+            font-size: 11px; font-weight: 700; color: var(--accent); letter-spacing: 0.05em;
+        }
+        .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: live-pulse 1.5s infinite; }
+        @keyframes live-pulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+        .btn-nav {
+            font-size: 12px; font-weight: 600; color: var(--text-dim);
+            text-decoration: none; padding: 6px 14px; border-radius: 6px;
+            border: 1px solid var(--border); transition: all 0.15s;
+        }
+        .btn-nav:hover { color: var(--text); border-color: var(--accent); }
+        .last-updated { font-size: 11px; font-family: 'IBM Plex Mono', monospace; color: var(--text-muted); }
+
+        /* ---- Layout ---- */
+        .container { max-width: 1600px; margin: 0 auto; padding: 24px 32px; }
+
+        /* ---- KPI Cards ---- */
+        .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+        .kpi-card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; padding: 20px 24px;
+            position: relative; overflow: hidden; transition: border-color 0.2s;
+        }
+        .kpi-card:hover { border-color: rgba(255,255,255,0.15); }
+        .kpi-card::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+            background: var(--card-accent, var(--accent));
+        }
+        .kpi-icon {
+            width: 36px; height: 36px; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            background: var(--card-accent-dim, var(--accent-dim));
+            margin-bottom: 14px;
+        }
+        .kpi-icon svg { color: var(--card-accent, var(--accent)); }
+        .kpi-value { font-size: 32px; font-weight: 800; font-family: 'IBM Plex Mono', monospace; line-height: 1; margin-bottom: 6px; }
+        .kpi-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+        .kpi-sub { font-size: 11px; color: var(--text-dim); margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+        .kpi-sub strong { color: var(--card-accent, var(--accent)); }
+
+        /* ---- Main Grid ---- */
+        .main-grid { display: grid; grid-template-columns: 1fr 380px; gap: 20px; margin-bottom: 20px; }
+        .panel {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; overflow: hidden;
+        }
+        .panel-header {
+            padding: 16px 20px; border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .panel-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); display: flex; align-items: center; gap: 8px; }
+        .panel-title-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+        .panel-body { padding: 20px; }
+
+        /* Chart */
+        .chart-wrap { height: 220px; position: relative; }
+
+        /* Bottom grid */
+        .bottom-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+
+        /* ---- List Items ---- */
+        .rank-list { list-style: none; }
+        .rank-item {
+            display: flex; align-items: center; gap: 12px;
+            padding: 10px 0; border-bottom: 1px solid var(--border);
+        }
+        .rank-item:last-child { border-bottom: none; }
+        .rank-num { font-size: 11px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; color: var(--text-muted); width: 20px; }
+        .rank-bar-wrap { flex: 1; }
+        .rank-name { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
+        .rank-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+        .rank-bar-bg { height: 3px; background: var(--surface-3); border-radius: 2px; margin-top: 4px; }
+        .rank-bar-fill { height: 3px; border-radius: 2px; background: var(--accent); transition: width 0.8s ease; }
+        .rank-count { font-size: 12px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; color: var(--accent); white-space: nowrap; }
+
+        /* Alert card */
+        .alert-card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; padding: 20px;
+        }
+        .alert-row {
+            display: flex; align-items: flex-start; gap: 12px;
+            padding: 12px 0; border-bottom: 1px solid var(--border);
+        }
+        .alert-row:last-child { border-bottom: none; }
+        .alert-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .alert-body { flex: 1; }
+        .alert-title { font-size: 12px; font-weight: 700; color: var(--text); }
+        .alert-sub { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+        .alert-val { font-size: 14px; font-weight: 800; font-family: 'IBM Plex Mono', monospace; white-space: nowrap; }
+
+        .text-green { color: var(--accent); }
+        .text-red { color: var(--red); }
+        .text-yellow { color: var(--yellow); }
+        .text-blue { color: var(--blue); }
+
+        .skeleton { background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 50%, var(--surface-2) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 4px; }
+        @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+    </style>
+</head>
+<body>
+<header class="header">
+    <div class="header-left">
+        <div class="logo" style="display:flex; align-items:center; gap:8px;">
+            Telegram<span>-Vault</span>
+        </div>
+        <div class="page-title">Intelligence Hub</div>
+    </div>
+    <div class="header-right">
+        <span class="last-updated" id="last-updated">--:--:--</span>
+        <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+        <a href="/" class="btn-nav">← Log View</a>
+        <a href="/logout" class="btn-nav" style="color:var(--red); border-color:rgba(239,68,68,0.3);">Logout</a>
+    </div>
+</header>
+
+<div class="container">
+    <!-- KPI Cards -->
+    <div class="kpi-grid">
+        <div class="kpi-card" style="--card-accent:#10b981; --card-accent-dim:rgba(16,185,129,0.1);">
+            <div class="kpi-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+            </div>
+            <div class="kpi-value text-green" id="kpi-total">—</div>
+            <div class="kpi-label">Total Records</div>
+            <div class="kpi-sub">Last hour: <strong id="kpi-last-hour">—</strong> messages</div>
+        </div>
+        <div class="kpi-card" style="--card-accent:#ef4444; --card-accent-dim:rgba(239,68,68,0.1);">
+            <div class="kpi-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg>
+            </div>
+            <div class="kpi-value text-red" id="kpi-deleted">—</div>
+            <div class="kpi-label">Suspicious Deletions</div>
+            <div class="kpi-sub"><strong id="kpi-del-pct">—</strong> of total logs</div>
+        </div>
+        <div class="kpi-card" style="--card-accent:#3b82f6; --card-accent-dim:rgba(59,130,246,0.1);">
+            <div class="kpi-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            </div>
+            <div class="kpi-value text-blue" id="kpi-users">—</div>
+            <div class="kpi-label">Active Profiles (24h)</div>
+            <div class="kpi-sub"><strong>Unique</strong> users tracked in 24h</div>
+        </div>
+        <div class="kpi-card" style="--card-accent:#f59e0b; --card-accent-dim:rgba(245,158,11,0.1);">
+            <div class="kpi-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+            </div>
+            <div class="kpi-value text-yellow" id="kpi-top-group-count">—</div>
+            <div class="kpi-label">Most Active Group (1h)</div>
+            <div class="kpi-sub" id="kpi-top-group-name" style="color:var(--yellow);">Loading...</div>
+        </div>
+    </div>
+
+    <!-- Velocity Chart + Alert Panel -->
+    <div class="main-grid">
+        <div class="panel">
+            <div class="panel-header">
+                <div class="panel-title"><div class="panel-title-dot"></div>Message Pulse — Last 24 Hours</div>
+            </div>
+            <div class="panel-body">
+                <div class="chart-wrap">
+                    <canvas id="velocity-chart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="panel-header">
+                <div class="panel-title"><div class="panel-title-dot" style="background:var(--red)"></div>Operational Status</div>
+            </div>
+            <div class="panel-body" style="padding:12px 20px;">
+                <div class="alert-row">
+                    <div class="alert-icon" style="background:rgba(16,185,129,0.1);">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                    </div>
+                    <div class="alert-body">
+                        <div class="alert-title">Message Rate (Last 1h)</div>
+                        <div class="alert-sub">Real-time data flow rate</div>
+                    </div>
+                    <div class="alert-val text-green" id="stat-velocity">—/h</div>
+                </div>
+                <div class="alert-row">
+                    <div class="alert-icon" style="background:rgba(239,68,68,0.1);">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                    </div>
+                    <div class="alert-body">
+                        <div class="alert-title">Most Deleted Group</div>
+                        <div class="alert-sub" id="stat-del-group-name">Loading...</div>
+                    </div>
+                    <div class="alert-val text-red" id="stat-del-group-count">—</div>
+                </div>
+                <div class="alert-row">
+                    <div class="alert-icon" style="background:rgba(245,158,11,0.1);">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    </div>
+                    <div class="alert-body">
+                        <div class="alert-title">System Time</div>
+                        <div class="alert-sub">Europe/Istanbul (UTC+3)</div>
+                    </div>
+                    <div class="alert-val text-yellow" id="stat-time">--:--:--</div>
+                </div>
+                <div class="alert-row">
+                    <div class="alert-icon" style="background:rgba(59,130,246,0.1);">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+                    </div>
+                    <div class="alert-body">
+                        <div class="alert-title">Database</div>
+                        <div class="alert-sub">PostgreSQL — Connected</div>
+                    </div>
+                    <div class="alert-val text-blue">●&nbsp;Active</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom: Top Groups + Top Users + Deleted groups -->
+    <div class="bottom-grid">
+        <div class="panel">
+            <div class="panel-header">
+                <div class="panel-title"><div class="panel-title-dot" style="background:var(--yellow)"></div>Top Groups (24h)</div>
+            </div>
+            <div class="panel-body" style="padding:12px 20px;">
+                <ul class="rank-list" id="top-groups-list">
+                    <li class="rank-item"><div class="skeleton" style="width:100%;height:36px;"></div></li>
+                </ul>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="panel-header">
+                <div class="panel-title"><div class="panel-title-dot" style="background:var(--blue)"></div>Top Users (24h)</div>
+            </div>
+            <div class="panel-body" style="padding:12px 20px;">
+                <ul class="rank-list" id="top-users-list">
+                    <li class="rank-item"><div class="skeleton" style="width:100%;height:36px;"></div></li>
+                </ul>
+            </div>
+        </div>
+        <div class="panel" style="border-color: rgba(239,68,68,0.2);">
+            <div class="panel-header" style="border-color:rgba(239,68,68,0.15);">
+                <div class="panel-title"><div class="panel-title-dot" style="background:var(--red)"></div>Suspicious Activity Summary</div>
+            </div>
+            <div class="panel-body" style="padding:20px;">
+                <div style="text-align:center; margin-bottom:20px;">
+                    <div style="font-size:48px; font-weight:800; font-family:'IBM Plex Mono',monospace; color:var(--red); line-height:1;" id="summary-deleted">—</div>
+                    <div style="font-size:11px; color:var(--text-muted); margin-top:4px; text-transform:uppercase; letter-spacing:0.08em;">Total Suspicious Deletions</div>
+                </div>
+                <div style="background:var(--surface-2); border-radius:8px; padding:14px; margin-bottom:12px;">
+                    <div style="font-size:11px; color:var(--text-muted); margin-bottom:4px;">Most Suspicious Group (Last 1h)</div>
+                    <div style="font-size:13px; font-weight:700; color:var(--red);" id="summary-del-group">—</div>
+                </div>
+                <div style="background:var(--surface-2); border-radius:8px; padding:14px;">
+                    <div style="font-size:11px; color:var(--text-muted); margin-bottom:4px;">Deletion Rate</div>
+                    <div style="font-size:13px; font-weight:700; color:var(--yellow);" id="summary-del-rate">—</div>
+                    <div style="height:4px; background:var(--surface-3); border-radius:2px; margin-top:8px; overflow:hidden;">
+                        <div style="height:4px; background:var(--red); border-radius:2px; transition:width 1s ease;" id="summary-del-bar"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div style="text-align: center; margin-bottom: 24px; font-size: 11px; color: var(--text-muted);">
+    Powered by <a href="https://github.com/diceandink" target="_blank" style="color:var(--text-muted); text-decoration:none;">github.com/diceandink</a>
+</div>
+
+<script>
+let velocityChart = null;
+
+function updateClock() {
+    const now = new Date();
+    const tr = now.toLocaleTimeString('tr-TR', {hour:'2-digit', minute:'2-digit', second:'2-digit', timeZone:'Europe/Istanbul'});
+    document.getElementById('stat-time').textContent = tr;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+async function loadDashboard() {
+    try {
+        const r = await fetch('/api/dashboard');
+        if (!r.ok) return;
+        const d = await r.json();
+
+        // KPIs
+        document.getElementById('kpi-total').textContent = d.total.toLocaleString('tr-TR');
+        document.getElementById('kpi-last-hour').textContent = d.last_hour;
+        document.getElementById('kpi-deleted').textContent = d.total_deleted.toLocaleString('tr-TR');
+        const pct = d.total > 0 ? ((d.total_deleted / d.total) * 100).toFixed(1) : 0;
+        document.getElementById('kpi-del-pct').textContent = `%${pct}`;
+        document.getElementById('kpi-users').textContent = d.active_users_24h.toLocaleString('tr-TR');
+        document.getElementById('kpi-top-group-count').textContent = d.top_group.count;
+        document.getElementById('kpi-top-group-name').textContent = d.top_group.name;
+
+        // Stat panel
+        document.getElementById('stat-velocity').textContent = `${d.last_hour}/h`;
+        document.getElementById('stat-del-group-name').textContent = d.top_deleted_group.name;
+        document.getElementById('stat-del-group-count').textContent = d.top_deleted_group.count + ' deleted';
+
+        // Last updated
+        document.getElementById('last-updated').textContent = 'Updated: ' + d.generated_at;
+
+        // Summary panel
+        document.getElementById('summary-deleted').textContent = d.total_deleted;
+        document.getElementById('summary-del-group').textContent = d.top_deleted_group.name;
+        document.getElementById('summary-del-rate').textContent = `%${pct} (${d.total_deleted} / ${d.total})`;
+        const barPct = Math.min(parseFloat(pct), 100);
+        document.getElementById('summary-del-bar').style.width = barPct + '%';
+
+        // Velocity chart
+        const labels = d.velocity.map(v => v.hour);
+        const values = d.velocity.map(v => v.count);
+        if (!velocityChart) {
+            const ctx = document.getElementById('velocity-chart').getContext('2d');
+            const gradient = ctx.createLinearGradient(0, 0, 0, 220);
+            gradient.addColorStop(0, 'rgba(16,185,129,0.3)');
+            gradient.addColorStop(1, 'rgba(16,185,129,0.0)');
+            velocityChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Messages/Hour',
+                        data: values,
+                        borderColor: '#10b981',
+                        backgroundColor: gradient,
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        pointBackgroundColor: '#10b981',
+                        tension: 0.4,
+                        fill: true,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#4d5566', font: { family: 'IBM Plex Mono', size: 10 } } },
+                        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#4d5566', font: { family: 'IBM Plex Mono', size: 10 } }, beginAtZero: true }
+                    }
+                }
+            });
+        } else {
+            velocityChart.data.labels = labels;
+            velocityChart.data.datasets[0].data = values;
+            velocityChart.update();
+        }
+
+        // Top Groups
+        const maxG = d.top_groups[0]?.count || 1;
+        document.getElementById('top-groups-list').innerHTML = d.top_groups.map((g, i) => `
+            <li class="rank-item">
+                <div class="rank-num">#${i+1}</div>
+                <div class="rank-bar-wrap">
+                    <div class="rank-name">${g.name}</div>
+                    <div class="rank-bar-bg"><div class="rank-bar-fill" style="width:${(g.count/maxG*100).toFixed(0)}%; background:var(--yellow);"></div></div>
+                </div>
+                <div class="rank-count" style="color:var(--yellow)">${g.count}</div>
+            </li>`).join('');
+
+        // Top Users
+        const maxU = d.top_users[0]?.count || 1;
+        document.getElementById('top-users-list').innerHTML = d.top_users.map((u, i) => `
+            <li class="rank-item">
+                <div class="rank-num">#${i+1}</div>
+                <div class="rank-bar-wrap">
+                    <div class="rank-name">@${u.username}</div>
+                    <div class="rank-sub">${u.name}</div>
+                    <div class="rank-bar-bg"><div class="rank-bar-fill" style="width:${(u.count/maxU*100).toFixed(0)}%;"></div></div>
+                </div>
+                <div class="rank-count">${u.count}</div>
+            </li>`).join('');
+
+    } catch(e) { console.error(e); }
+}
+
+loadDashboard();
+setInterval(loadDashboard, 30000); // Auto-refresh every 30 seconds
+</script>
+</body>
+</html>

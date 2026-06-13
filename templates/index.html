@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram Vault — Log Viewer</title>
+    <link rel="icon" type="image/svg+xml" href="/static/logo.svg">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg: #101012;
+            --surface: #18181b;
+            --surface-2: #1f1f23;
+            --border: #27272a;
+            --border-light: #333;
+            --text: #e4e4e7;
+            --text-dim: #71717a;
+            --text-muted: #52525b;
+            --accent: #10b981;
+            --accent-dim: rgba(16, 185, 129, 0.12);
+            --danger: #ef4444;
+        }
+
+        body {
+            font-family: 'IBM Plex Sans', -apple-system, system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* ---- Layout ---- */
+        .container { max-width: 1440px; margin: 0 auto; padding: 32px 24px; }
+
+        /* ---- Header ---- */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 24px;
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--border);
+        }
+        .header-left { display: flex; align-items: center; gap: 16px; }
+        .logo { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; color: #fff; }
+        .logo span { color: var(--text-muted); font-weight: 400; }
+        .badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: var(--accent-dim); color: var(--accent);
+            font-size: 11px; font-weight: 600; padding: 4px 12px;
+            border-radius: 999px;
+        }
+        .badge::before {
+            content: ''; width: 6px; height: 6px;
+            background: var(--accent); border-radius: 50%;
+        }
+        .header-right { display: flex; align-items: center; gap: 24px; }
+        .stat { text-align: right; }
+        .stat-value { font-family: 'IBM Plex Mono', monospace; font-size: 24px; font-weight: 700; color: #fff; }
+        .stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+        .btn-logout {
+            font-size: 12px; font-weight: 600; color: var(--text-muted);
+            border: 1px solid var(--border); padding: 6px 16px;
+            background: none; cursor: pointer; text-decoration: none;
+            transition: all 0.15s;
+        }
+        .btn-logout:hover { color: var(--danger); border-color: var(--danger); }
+
+        /* ---- Filters ---- */
+        .filters {
+            display: flex; gap: 12px; margin-bottom: 20px;
+            flex-wrap: wrap; align-items: flex-end;
+        }
+        .filter-group { flex: 1; min-width: 200px; }
+        .filter-group label {
+            display: block; font-size: 11px; font-weight: 600;
+            color: var(--text-muted); text-transform: uppercase;
+            letter-spacing: 0.05em; margin-bottom: 6px;
+        }
+        .filter-group input {
+            width: 100%; padding: 0 14px; height: 40px; box-sizing: border-box;
+            background: var(--surface); border: 1px solid var(--border);
+            color: var(--text); font-size: 13px;
+            font-family: 'IBM Plex Mono', monospace;
+            outline: none; transition: border-color 0.15s;
+        }
+        .filter-group input:focus { border-color: var(--accent); }
+        .filter-group input::placeholder { color: var(--text-muted); }
+        .btn-search {
+            height: 40px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center;
+            padding: 0 28px; background: var(--accent); border: none;
+            color: #000; font-size: 13px; font-weight: 700;
+            cursor: pointer; transition: opacity 0.15s;
+            white-space: nowrap;
+        }
+        .btn-search:hover { opacity: 0.85; }
+
+        /* ---- Table ---- */
+        .table-wrap {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        thead th {
+            padding: 14px 20px; font-size: 11px; font-weight: 600;
+            color: var(--text-muted); text-transform: uppercase;
+            letter-spacing: 0.04em; text-align: left;
+            background: var(--surface-2); border-bottom: 1px solid var(--border);
+        }
+        tbody tr {
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            cursor: pointer; transition: background 1.5s ease-out;
+        }
+        @keyframes newRowAnim {
+            0% { opacity: 0; transform: translateY(-8px); background: rgba(16, 185, 129, 0.4); }
+            20% { opacity: 1; transform: translateY(0); background: rgba(16, 185, 129, 0.25); }
+            100% { opacity: 1; transform: translateY(0); background: transparent; }
+        }
+        .flash-new { animation: newRowAnim 2s ease-out forwards; }
+
+        tbody tr:hover { background: rgba(255,255,255,0.02); }
+        tbody td { padding: 14px 20px; font-size: 13px; vertical-align: top; }
+        .col-time { width: 160px; }
+        .col-group { width: 220px; }
+        .col-sender { width: 240px; }
+        .cell-time { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--text-dim); }
+        .cell-group-name { font-weight: 600; color: #fff; font-size: 12px; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .cell-group-id { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--text-muted); }
+        .cell-sender-name { font-weight: 600; color: var(--text); font-size: 12px; }
+        .cell-sender-username { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--accent); }
+        .cell-sender-id { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--text-muted); }
+        .cell-content { color: #ffffff; font-size: 13px; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .empty-state { text-align: center; padding: 80px 20px; color: var(--text-muted); font-size: 13px; }
+
+        /* ---- Pagination ---- */
+        .pagination {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 14px 20px; border-top: 1px solid var(--border);
+            background: var(--surface-2);
+        }
+        .pagination-info { font-size: 12px; color: var(--text-muted); }
+        .pagination-btns { display: flex; gap: 8px; }
+        .btn-page {
+            padding: 6px 18px; font-size: 12px; font-weight: 600;
+            background: none; border: 1px solid var(--border);
+            color: var(--text-dim); cursor: pointer; transition: all 0.15s;
+        }
+        .btn-page:hover:not(:disabled) { border-color: var(--text-dim); color: var(--text); }
+        .btn-page:disabled { opacity: 0.25; cursor: default; }
+        
+        .tag-deleted { 
+            display: inline-block; 
+            background: rgba(220, 38, 38, 0.2); 
+            color: #ef4444; 
+            border: 1px solid rgba(220, 38, 38, 0.4);
+            padding: 2px 6px; 
+            border-radius: 4px; 
+            font-size: 10px; 
+            font-weight: 700; 
+            margin-bottom: 4px; 
+            animation: pulse-red 2s infinite;
+        }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); }
+            70% { box-shadow: 0 0 0 4px rgba(220, 38, 38, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+        }
+
+        /* ---- Custom Toggle for Deleted ---- */
+        label.deleted-toggle {
+            display: inline-flex !important; align-items: center; gap: 8px;
+            background: var(--surface-2); border: 1px solid var(--border);
+            padding: 0 16px; border-radius: 8px; cursor: pointer;
+            transition: all 0.2s ease; user-select: none; margin-bottom: 0 !important;
+            height: 40px; box-sizing: border-box; width: 100%; justify-content: center;
+            font-size: 13px !important; font-weight: 600 !important;
+            text-transform: none !important; letter-spacing: normal !important;
+        }
+        .deleted-toggle.active {
+            background: rgba(220, 38, 38, 0.1); border-color: rgba(220, 38, 38, 0.5);
+        }
+        .deleted-toggle input { display: none; }
+        .toggle-icon {
+            width: 12px; height: 12px; border-radius: 50%;
+            background: var(--border); transition: all 0.2s ease;
+        }
+        .deleted-toggle.active .toggle-icon {
+            background: #ef4444; box-shadow: 0 0 8px rgba(220, 38, 38, 0.8);
+        }
+        .toggle-text { color: var(--text-muted); font-size: 13px; font-weight: 600; }
+        .deleted-toggle.active .toggle-text { color: #ef4444; }
+        
+        .btn-export {
+            background: transparent; border: 1px solid var(--accent); color: var(--accent);
+            padding: 0 20px; border-radius: 8px; font-weight: 600; cursor: pointer;
+            transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center;
+            height: 40px; box-sizing: border-box; width: 100%;
+        }
+        .btn-export:hover { background: rgba(16, 185, 129, 0.1); box-shadow: 0 0 10px rgba(16,185,129,0.2); }
+
+
+        /* ---- Modal ---- */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0; z-index: 999;
+            background: rgba(0,0,0,0.85); align-items: center; justify-content: center;
+            padding: 20px;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal-box {
+            background: var(--surface); border: 1px solid var(--border);
+            width: 100%; max-width: 680px; max-height: 90vh;
+            overflow-y: auto; position: relative;
+        }
+        .modal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 20px 24px; border-bottom: 1px solid var(--border);
+        }
+        .modal-title { font-size: 16px; font-weight: 700; color: #fff; }
+        .modal-close {
+            background: none; border: none; color: var(--text-muted);
+            font-size: 20px; cursor: pointer; padding: 4px 8px;
+        }
+        .modal-close:hover { color: #fff; }
+        .modal-body { padding: 24px; }
+        .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+        .detail-item { padding: 12px 16px; background: var(--surface-2); border: 1px solid var(--border); }
+        .detail-label { font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+        .detail-value { font-size: 13px; color: #fff; font-weight: 500; }
+        .detail-value.mono { font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+        .detail-value.accent { color: var(--accent); }
+        .detail-full { grid-column: 1 / -1; }
+        .payload-box {
+            background: var(--bg); border: 1px solid var(--border);
+            padding: 20px; font-size: 13px; line-height: 1.7;
+            color: var(--text); white-space: pre-wrap; word-break: break-word;
+        }
+
+        @media (max-width: 768px) {
+            .header { flex-direction: column; align-items: flex-start; gap: 16px; }
+            .header-right { width: 100%; justify-content: space-between; }
+            .detail-grid { grid-template-columns: 1fr; }
+            .col-time, .col-group { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Modal -->
+    <div class="modal-overlay" id="modal" onclick="closeModal(event)">
+        <div class="modal-box" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title">Mesaj Detayları</div>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="detail-grid" id="modal-grid"></div>
+                <div>
+                    <div class="detail-label" style="margin-bottom:8px">Mesaj İçeriği</div>
+                    <div class="payload-box" id="modal-payload"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <header class="header">
+            <div class="header-left">
+                <div class="logo" style="display:flex; align-items:center; gap:8px;">
+                    Telegram<span>-Vault</span>
+                </div>
+                <div class="badge">Active</div>
+            </div>
+            <div class="header-right">
+                <div class="stat">
+                    <div class="stat-value" id="total-count">0</div>
+                    <div class="stat-label">Total Records</div>
+                </div>
+                <div class="stat" style="display:none" id="update-stat">
+                    <div class="stat-value" id="last-update" style="font-size:14px">--:--:--</div>
+                    <div class="stat-label">System Time</div>
+                </div>
+                <a href="/dashboard" class="btn-logout" style="border-color: var(--accent); color: var(--accent);">Intelligence Hub</a>
+                <a href="/admin" class="btn-logout" style="margin-right: -8px;">Auth Logs</a>
+                <a href="/logout" class="btn-logout">Logout</a>
+            </div>
+        </header>
+
+        <div class="filters">
+            <div class="filter-group" style="flex:2">
+                <label>Search Messages</label>
+                <input type="text" id="query" placeholder="Keyword...">
+            </div>
+            <div class="filter-group" style="flex:1">
+                <label>Username</label>
+                <input type="text" id="username" placeholder="@username">
+            </div>
+            <div class="filter-group" style="flex:1">
+                <label>Group/Channel</label>
+                <input type="text" id="groupname" placeholder="Group name...">
+            </div>
+            <div class="filter-group" style="flex:0.5;">
+                <label>&nbsp;</label>
+                <label class="deleted-toggle" id="deleted-toggle-label">
+                    <input type="checkbox" id="is_deleted">
+                    <div class="toggle-icon"></div>
+                    <span class="toggle-text">Only Deleted</span>
+                </label>
+            </div>
+            <div class="filter-group">
+                <label>&nbsp;</label>
+                <button class="btn-search" id="search-btn" style="width: 100%; border-radius: 8px;">Search</button>
+            </div>
+            <div class="filter-group">
+                <label>&nbsp;</label>
+                <button class="btn-export" id="export-btn" title="Download Results as CSV">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    Download CSV
+                </button>
+            </div>
+        </div>
+
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th class="col-time">Date</th>
+                        <th class="col-group">Group</th>
+                        <th class="col-sender">Sender</th>
+                        <th>Message</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody">
+                    <tr><td colspan="4" class="empty-state">Loading data...</td></tr>
+                </tbody>
+            </table>
+            <div class="pagination">
+                <div class="pagination-info" id="page-info">Page 1</div>
+                <div class="pagination-btns">
+                    <button class="btn-page" id="prev-btn" disabled>Previous</button>
+                    <button class="btn-page" id="next-btn" disabled>Next</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let page = 1, data = [];
+        let totalCount = 0;
+        const SIZE = 50;
+        const $ = id => document.getElementById(id);
+
+        function updateClock() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('en-US', { timeZone: 'Europe/Istanbul', hour12: false });
+            $('last-update').textContent = timeString;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        async function load(p = 1) {
+            page = p;
+            const q = $('query').value.trim();
+            const u = $('username').value.trim().replace('@','');
+            const g = $('groupname').value.trim();
+            const d = $('is_deleted').checked;
+            
+            const params = new URLSearchParams({page: p, page_size: SIZE});
+            if (q) params.set('query', q);
+            if (u) params.set('username', u);
+            if (g) params.set('chat_title', g);
+            if (d) params.set('is_deleted', 'true');
+
+            try {
+                const r = await fetch('/api/messages?' + params);
+                if (r.status === 401) { location.href = '/login'; return; }
+                const json = await r.json();
+                data = json.results;
+                totalCount = json.total;
+
+                $('total-count').textContent = totalCount.toLocaleString('en-US');
+                $('update-stat').style.display = 'block';
+
+                const from = totalCount === 0 ? 0 : (p - 1) * SIZE + 1;
+                const to = Math.min(totalCount, p * SIZE);
+                $('page-info').textContent = totalCount > 0
+                    ? `${from}–${to} / ${totalCount.toLocaleString('en-US')} records`
+                    : 'No records found';
+
+                const tb = $('tbody');
+                tb.innerHTML = '';
+
+                if (data.length === 0) {
+                    tb.innerHTML = '<tr><td colspan="4" class="empty-state">No results found.</td></tr>';
+                } else {
+                    data.forEach((m, i) => {
+                        tb.appendChild(createRow(m, i));
+                    });
+                }
+
+                $('prev-btn').disabled = p <= 1;
+                $('next-btn').disabled = p * SIZE >= totalCount;
+            } catch(e) { console.error(e); }
+        }
+
+        function createRow(m, i) {
+            const tr = document.createElement('tr');
+            tr.onclick = () => detail(m);
+            tr.setAttribute('data-msgid', m.message_id);
+            tr.setAttribute('data-chatid', m.chat_id);
+            const t = new Date(m.timestamp);
+            
+            let contentHtml = esc(m.content);
+            if (m.is_deleted) {
+                contentHtml = `<span class="tag-deleted">🔴 DELETED - SUSPICIOUS</span><br>` + contentHtml;
+            }
+            
+            tr.innerHTML = `
+                <td class="col-time cell-time">${t.toLocaleDateString('en-US')}<br>${t.toLocaleTimeString('en-US')}</td>
+                <td class="col-group">
+                    <div class="cell-group-name">${esc(m.chat_title || 'Private')}</div>
+                    <div class="cell-group-id">${m.chat_id}</div>
+                </td>
+                <td class="col-sender">
+                    <div class="cell-sender-name">${esc(m.sender_name)}</div>
+                    <div class="cell-sender-username">${m.username ? '@' + esc(m.username) : '—'}</div>
+                    <div class="cell-sender-id">ID: ${m.user_id}</div>
+                </td>
+                <td class="cell-content">${contentHtml}</td>`;
+            return tr;
+        }
+
+        function detail(m) {
+            const t = new Date(m.timestamp);
+            $('modal-grid').innerHTML = `
+                <div class="detail-item">
+                    <div class="detail-label">Date & Time</div>
+                    <div class="detail-value mono">${t.toLocaleString('en-US')}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Message ID</div>
+                    <div class="detail-value mono">${m.message_id}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Group / Channel</div>
+                    <div class="detail-value">${esc(m.chat_title || 'Private')}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Group ID</div>
+                    <div class="detail-value mono">${m.chat_id}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Sender</div>
+                    <div class="detail-value">${esc(m.sender_name)}</div>
+                <div class="detail-item">
+                    <div class="detail-label">Username</div>
+                    <div class="detail-value accent mono">${m.username ? '@' + esc(m.username) : '—'}</div>
+                </div>
+                <div class="detail-item" style="grid-column: span 2;">
+                    <div class="detail-label">Message Content</div>
+                    <div class="detail-value" style="background: rgba(0,0,0,0.3); padding: 12px; border-radius: 4px; white-space: pre-wrap; font-size: 13px;">${esc(m.content)}</div>
+                </div>
+            `;
+            // Eger silinmis mesajsa modal icinde de goster
+            if (m.is_deleted) {
+                $('modal-grid').innerHTML = `<div class="detail-item" style="grid-column: span 2;"><span class="tag-deleted">🔴 DELETED - SUSPICIOUS (Deleted by user or panic button)</span></div>` + $('modal-grid').innerHTML;
+            }
+            
+            $('modal-grid').innerHTML += `
+                <div class="detail-item" style="grid-column: span 2; text-align: center; margin-top: 10px;">
+                    <button onclick="loadProfile(${m.user_id})" style="background: var(--accent); color: #000; border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; border-radius: 4px; width: 100%;">🕵️‍♂️ Generate Target Intelligence Profile (OSINT)</button>
+                </div>
+            `;
+            $('modal').classList.add('open');
+        }
+
+        async function loadProfile(userId) {
+            $('modal-grid').innerHTML = '<div style="text-align:center; grid-column:span 2; padding:40px;">Analyzing profile... 🕵️‍♂️</div>';
+            try {
+                const r = await fetch('/api/profile/' + userId);
+                const p = await r.json();
+                if (p.error) {
+                    $('modal-grid').innerHTML = `<div style="grid-column:span 2; color:#ef4444;">${p.error}</div>`;
+                    return;
+                }
+                
+                let groupsHtml = p.groups.map(g => `<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:12px;"><span style="color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:80%;">${esc(g.name)}</span><span style="color:var(--accent)">${g.count}</span></div>`).join('');
+                
+                let maxHour = Math.max(...Object.values(p.hours), 1);
+                let hoursHtml = '<div style="display:flex; align-items:flex-end; height:60px; gap:2px; margin-top:10px;">';
+                for(let i=0; i<24; i++) {
+                    let hCount = p.hours[i] || 0;
+                    let height = (hCount / maxHour) * 100;
+                    hoursHtml += `<div title="Hour ${i}:00 - ${hCount} messages" style="flex:1; background: ${hCount > 0 ? 'var(--accent)' : 'rgba(255,255,255,0.1)'}; height: ${Math.max(height, 5)}%; border-radius: 2px 2px 0 0;"></div>`;
+                }
+                hoursHtml += '</div>';
+                hoursHtml += '<div style="display:flex; justify-content:space-between; font-size:9px; color:var(--text-muted); margin-top:4px;">';
+                for(let i=0; i<24; i++) {
+                    hoursHtml += `<span style="flex:1; text-align:center;">${String(i).padStart(2,'0')}</span>`;
+                }
+                hoursHtml += '</div>';
+
+                $('modal-grid').innerHTML = `
+                    <div class="detail-item" style="grid-column: span 2; border-bottom: 1px solid var(--border); padding-bottom:15px; margin-bottom:5px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <h2 style="margin:0; font-size:18px; color:#fff;">🎯 TARGET PROFILE</h2>
+                            <div style="background:var(--surface-2); padding:4px 10px; border-radius:4px; font-family:monospace; color:var(--accent);">ID: ${p.user_id}</div>
+                        </div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Target Name</div>
+                        <div class="detail-value" style="color:#fff;">${esc(p.sender_name)}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Username</div>
+                        <div class="detail-value" style="color:var(--accent)">${p.username !== 'None' ? '@'+esc(p.username) : 'None'}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Total Messages</div>
+                        <div class="detail-value mono">${p.total.toLocaleString('en-US')}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Seen in System (First - Last)</div>
+                        <div class="detail-value" style="font-size:11px;">${new Date(p.first_seen).toLocaleDateString('en-US')} - ${new Date(p.last_seen).toLocaleDateString('en-US')}</div>
+                    </div>
+                    
+                    <div class="detail-item" style="grid-column: span 2; background:var(--surface-2); padding:15px; border-radius:4px;">
+                        <div class="detail-label" style="margin-bottom:10px;">Most Active Groups / Channels</div>
+                        ${groupsHtml}
+                    </div>
+                    
+                    <div class="detail-item" style="grid-column: span 2; background:var(--surface-2); padding:15px; border-radius:4px;">
+                        <div class="detail-label">Hourly Activity Map (When are they awake?)</div>
+                        ${hoursHtml}
+                    </div>
+                `;
+            } catch(e) {
+                console.error(e);
+                $('modal-grid').innerHTML = '<div style="grid-column:span 2; color:#ef4444;">Analysis failed.</div>';
+            }
+        }
+
+        function closeModal(e) {
+            if (!e || e.target === $('modal')) $('modal').classList.remove('open');
+        }
+
+        function esc(s) {
+            const d = document.createElement('div');
+            d.textContent = s || '';
+            return d.innerHTML;
+        }
+
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') $('modal').classList.remove('open'); });
+        $('search-btn').addEventListener('click', () => load(1));
+        $('query').addEventListener('keydown', e => { if (e.key === 'Enter') load(1); });
+        $('username').addEventListener('keydown', e => { if (e.key === 'Enter') load(1); });
+        $('groupname').addEventListener('keydown', e => { if (e.key === 'Enter') load(1); });
+        $('is_deleted').addEventListener('change', (e) => {
+            if(e.target.checked) $('deleted-toggle-label').classList.add('active');
+            else $('deleted-toggle-label').classList.remove('active');
+            load(1);
+        });
+        
+        $('export-btn').addEventListener('click', () => {
+            const q = $('query').value.trim();
+            const u = $('username').value.trim().replace('@','');
+            const g = $('groupname').value.trim();
+            const d = $('is_deleted').checked;
+            
+            const params = new URLSearchParams();
+            if (q) params.set('query', q);
+            if (u) params.set('username', u);
+            if (g) params.set('chat_title', g);
+            if (d) params.set('is_deleted', 'true');
+            
+            window.location.href = '/api/export?' + params.toString();
+        });
+
+        $('prev-btn').addEventListener('click', () => load(page - 1));
+        $('next-btn').addEventListener('click', () => load(page + 1));
+
+        // WebSocket for live streaming
+        function initWebSocket() {
+            const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const ws = new WebSocket(`${proto}//${location.host}/ws`);
+            
+            ws.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+                
+                // Silinen mesaj sinyali ise
+                if (msg.type === 'DELETED') {
+                    // Ekranda o mesaji bulup tag ekle
+                    const rows = document.querySelectorAll(`tr[data-msgid="${msg.message_id}"][data-chatid="${msg.chat_id}"]`);
+                    rows.forEach(r => {
+                        const contentTd = r.querySelector('.cell-content');
+                        if (contentTd && !contentTd.innerHTML.includes('tag-deleted')) {
+                            contentTd.innerHTML = `<span class="tag-deleted">🔴 SİLİNDİ - ŞÜPHELİ</span><br>` + contentTd.innerHTML;
+                        }
+                    });
+                    
+                    // Veri dizisinde de guncelle (detaylara tiklayinca da gozuksun)
+                    const mObj = data.find(d => d.message_id === msg.message_id && d.chat_id === msg.chat_id);
+                    if (mObj) mObj.is_deleted = true;
+                    return;
+                }
+                
+                // Sadece sayfa 1'deysek ve filtrelere uyuyorsa canlı ekle
+                if (page === 1) {
+                    const q = $('query').value.trim().toLowerCase();
+                    const u = $('username').value.trim().toLowerCase().replace('@','');
+                    const g = $('groupname').value.trim().toLowerCase();
+                    const d = $('is_deleted').checked;
+                    
+                    let match = true;
+                    if (d) match = false; // Normal yeni gelen mesajlar is_deleted false oldugu icin Sadece Silinenler seciliyse ekrana dusmesin.
+                    if (q && !msg.content.toLowerCase().includes(q)) match = false;
+                    if (u && (!msg.username || !msg.username.toLowerCase().includes(u))) match = false;
+                    if (g && (!msg.chat_title || !msg.chat_title.toLowerCase().includes(g))) match = false;
+                    
+                    if (match) {
+                        data.unshift(msg);
+                        if (data.length > SIZE) data.pop();
+                        
+                        const tb = $('tbody');
+                        const empty = tb.querySelector('.empty-state');
+                        if (empty) empty.parentElement.remove();
+                        
+                        const row = createRow(msg, 0);
+                        row.classList.add('flash-new');
+                        tb.insertBefore(row, tb.firstChild);
+                        
+                        if (tb.children.length > SIZE) tb.lastChild.remove();
+                        
+                        // Animasyon bittikten sonra class'ı sil, böylece :hover efekti geri gelsin
+                        setTimeout(() => row.classList.remove('flash-new'), 2000);
+                        
+                        totalCount++;
+                        $('total-count').textContent = totalCount.toLocaleString('en-US');
+                    }
+                }
+            };
+            
+            ws.onclose = () => { setTimeout(initWebSocket, 3000); };
+        }
+
+        load(1);
+        initWebSocket();
+    </script>
+</body>
+</html>

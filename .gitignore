@@ -1,0 +1,31 @@
+# Telegram Vault
+
+## Environment variables
+.env
+
+## Python virtual environment
+venv/
+env/
+ENV/
+.venv/
+
+## Cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+## Logs
+*.log
+security.log
+
+## IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+## Telethon / Session files
+*.session
+*.session-journal
+AUTH_ERROR.flag
